@@ -74,6 +74,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.res.painterResource
 import com.example.fastingtracker.R
+import com.example.fastingtracker.ui.components.SkillEndFastButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -81,6 +82,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -138,17 +140,19 @@ fun HomeScreen(
         item {
             Spacer(modifier = Modifier.height(44.dp))
             val isLight = MaterialTheme.colorScheme.background == Color(0xFFFFFFFF)
-            val statusPillBg = if (isLight) Color(0xFFF0F0F0) else Color(0xFF1C1C1E)
+            val buttonBgColor = if (isLight) Color.White else Color.Black.copy(alpha = 0.5f)
             val elapsedColor = if (isLight) Color(0xFFD4AF37) else Color(0xFFFFDE4D)
             
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
+                    .width(175.dp)
+                    .height(40.dp)
+                    .border(BorderStroke(1.dp, elapsedColor), RoundedCornerShape(50))
                     .clip(RoundedCornerShape(50))
-                    .background(statusPillBg)
+                    .background(buttonBgColor)
                     .noRippleClickable { onTimelineClick(null) }
-                    .animateContentSize(animationSpec = tween(400))
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .padding(horizontal = 8.dp)
             ) {
                 val stageText by remember(isFasting, targetMillis, currentStage) {
                     derivedStateOf {
@@ -164,10 +168,12 @@ fun HomeScreen(
                     Text(
                         text = targetText,
                         color = elapsedColor,
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                         fontFamily = com.example.fastingtracker.ui.theme.GeistMonoFont,
-                        letterSpacing = 0.6.sp
+                        letterSpacing = 0.7.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -184,6 +190,7 @@ fun HomeScreen(
                     startTime = startTime,
                     elapsedMillisProvider = elapsedMillisProvider,
                     targetMillis = targetMillis,
+                    currentStage = currentStage,
                     onStartFast = onStartFast,
                     onEndFast = onEndFast,
                     onTimelineClick = onTimelineClick,
@@ -193,6 +200,18 @@ fun HomeScreen(
         }
 
         item {
+            if (isFasting) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    SkillEndFastButton(
+                        width = 175.dp,
+                        onClick = onEndFast
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Row(
                 modifier = Modifier
@@ -440,6 +459,7 @@ fun CircularTimerRing(
     startTime: Long,
     elapsedMillisProvider: () -> Long,
     targetMillis: Long,
+    currentStage: FastingStage,
     onStartFast: () -> Unit,
     onEndFast: () -> Unit,
     onTimelineClick: (Int?) -> Unit = {},
@@ -754,12 +774,28 @@ fun CircularTimerRing(
             }
         }
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(24.dp).zIndex(2f)
-        ) {
-            if (isFasting) {
+        if (isFasting) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize().zIndex(2f)
+            ) {
+                val stageIndex = FastingStage.entries.indexOf(currentStage)
+                if (stageIndex in 0..9) {
+                    Box(
+                        modifier = Modifier
+                            .offset(y = (-68).dp)
+                            .size(76.dp)
+                            .noRippleClickable { onTimelineClick(stageIndex) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = activePainters[stageIndex],
+                            contentDescription = currentStage.title,
+                            modifier = Modifier.size(76.dp)
+                        )
+                    }
+                }
+
                 TimerTextDisplay(
                     isCountdown = isCountdown,
                     onToggleCountdown = { 
@@ -771,82 +807,61 @@ fun CircularTimerRing(
                     isLight = isLight,
                     timeTextColor = timeTextColor
                 )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action Button matching HTML
-                Button(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onEndFast()
-                    },
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = buttonBgColor,
-                        contentColor = elapsedColor
-                    ),
-                    border = BorderStroke(1.dp, elapsedColor),
-                    shape = RoundedCornerShape(50),
-                    modifier = Modifier
-                        .height(40.dp)
-                        .wrapContentWidth(),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = "End Fast",
-                        color = elapsedColor,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = com.example.fastingtracker.ui.theme.GeistMonoFont,
-                        letterSpacing = 0.7.sp
-                    )
-                }
-            } else if (isFastingScheduled) {
-                var currentRemaining by remember(startTime) { mutableStateOf(startTime - System.currentTimeMillis()) }
-                LaunchedEffect(startTime) {
-                    while (true) {
-                        currentRemaining = startTime - System.currentTimeMillis()
-                        kotlinx.coroutines.delay(1000)
+            }
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.padding(24.dp).zIndex(2f)
+            ) {
+                if (isFastingScheduled) {
+                    var currentRemaining by remember(startTime) { mutableStateOf(startTime - System.currentTimeMillis()) }
+                    LaunchedEffect(startTime) {
+                        while (true) {
+                            currentRemaining = startTime - System.currentTimeMillis()
+                            kotlinx.coroutines.delay(1000)
+                        }
                     }
-                }
 
-                Text(
-                    text = "STARTS IN",
-                    color = elapsedColor.copy(alpha = 0.8f),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = com.example.fastingtracker.ui.theme.GeistMonoFont,
-                    letterSpacing = 2.sp
-                )
+                    Text(
+                        text = "STARTS IN",
+                        color = elapsedColor.copy(alpha = 0.8f),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = com.example.fastingtracker.ui.theme.GeistMonoFont,
+                        letterSpacing = 2.sp
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "- " + (if (currentRemaining > 0) formatMillis(currentRemaining) else "00:00:00"),
-                    color = timeTextColor,
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = com.example.fastingtracker.ui.theme.GeistFont,
-                    letterSpacing = (-0.96).sp,
-                    style = TextStyle(
-                        shadow = if (isLight) Shadow.None else Shadow(
-                            color = Color.Black.copy(alpha = 0.5f),
-                            offset = Offset(0f, 4f),
-                            blurRadius = 8f
+                    Text(
+                        text = "- " + (if (currentRemaining > 0) formatMillis(currentRemaining) else "00:00:00"),
+                        color = timeTextColor,
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = com.example.fastingtracker.ui.theme.GeistFont,
+                        letterSpacing = (-0.96).sp,
+                        style = TextStyle(
+                            shadow = if (isLight) Shadow.None else Shadow(
+                                color = Color.Black.copy(alpha = 0.5f),
+                                offset = Offset(0f, 4f),
+                                blurRadius = 8f
+                            )
                         )
                     )
-                )
 
-            } else {
-                // Idle state: Central START FAST trigger text with pulsing guide
-                Text(
-                    text = "START FAST",
-                    color = elapsedColor,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = com.example.fastingtracker.ui.theme.GeistFont,
-                    letterSpacing = (-0.5).sp,
-                    textAlign = TextAlign.Center
-                )
+                } else {
+                    // Idle state: Central START FAST trigger text with pulsing guide
+                    Text(
+                        text = "START FAST",
+                        color = elapsedColor,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = com.example.fastingtracker.ui.theme.GeistFont,
+                        letterSpacing = (-0.5).sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
         }
     }
