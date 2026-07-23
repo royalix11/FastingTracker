@@ -24,7 +24,7 @@ import com.example.fastingtracker.ui.theme.PrimaryNeonYellow
 @Composable
 fun SkillEndFastButton(
     modifier: Modifier = Modifier,
-    width: Dp = 175.dp,
+    width: Dp = 300.dp,
     onClick: () -> Unit
 ) {
     val isLight = MaterialTheme.colorScheme.background == Color(0xFFFFFFFF)
@@ -45,14 +45,14 @@ fun SkillEndFastButton(
         shape = RoundedCornerShape(50),
         modifier = modifier
             .width(width)
-            .height(40.dp),
+            .height(44.dp),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp)
     ) {
         Text(
             text = "End Fast",
             color = elapsedColor,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
             fontFamily = GeistMonoFont,
             letterSpacing = 0.7.sp
         )

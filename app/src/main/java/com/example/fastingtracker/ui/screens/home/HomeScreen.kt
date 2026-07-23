@@ -139,46 +139,7 @@ fun HomeScreen(
     ) {
         item {
             Spacer(modifier = Modifier.height(44.dp))
-            val isLight = MaterialTheme.colorScheme.background == Color(0xFFFFFFFF)
-            val buttonBgColor = if (isLight) Color.White else Color.Black.copy(alpha = 0.5f)
-            val elapsedColor = if (isLight) Color(0xFFD4AF37) else Color(0xFFFFDE4D)
-            
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .width(175.dp)
-                    .height(40.dp)
-                    .border(BorderStroke(1.dp, elapsedColor), RoundedCornerShape(50))
-                    .clip(RoundedCornerShape(50))
-                    .background(buttonBgColor)
-                    .noRippleClickable { onTimelineClick(null) }
-                    .padding(horizontal = 8.dp)
-            ) {
-                val stageText by remember(isFasting, targetMillis, currentStage) {
-                    derivedStateOf {
-                        val remaining = targetMillis - elapsedMillisProvider()
-                        if (!isFasting) "FASTING STAGES" else if (remaining > 0) currentStage.title else "OVERTIME"
-                    }
-                }
-                Crossfade(
-                    targetState = stageText,
-                    animationSpec = tween(400),
-                    label = "stageTransition"
-                ) { targetText ->
-                    Text(
-                        text = targetText,
-                        color = elapsedColor,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = com.example.fastingtracker.ui.theme.GeistMonoFont,
-                        letterSpacing = 0.7.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(16.dp))
+
             
             Box(
                 contentAlignment = Alignment.Center,
@@ -207,7 +168,7 @@ fun HomeScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     SkillEndFastButton(
-                        width = 175.dp,
+                        width = 300.dp,
                         onClick = onEndFast
                     )
                 }
@@ -262,7 +223,7 @@ fun HomeScreen(
 
     if (showStartTimeSheet) {
         val isLight = MaterialTheme.colorScheme.background == Color(0xFFFFFFFF)
-        val sheetBg = if (isLight) Color(0xFFF0F0F0) else Color(0xFF1C1C1E)
+        val sheetBg = if (isLight) Color(0xFFF0F0F0) else Color(0xFF242426)
         val elapsedColor = if (isLight) Color(0xFFD4AF37) else PrimaryNeonYellow
         var selectedDateTime by remember(startTime) {
             mutableStateOf(
@@ -276,7 +237,7 @@ fun HomeScreen(
             val endMillis = startMillis + targetMillis
             Instant.ofEpochMilli(endMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
         }
-        val cardBg = if (isLight) Color(0xFFE8E8E8) else Color(0xFF242426)
+        val cardBg = if (isLight) Color(0xFFE8E8E8) else Color(0xFF1C1C1E)
         val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
         ModalBottomSheet(
@@ -783,15 +744,17 @@ fun CircularTimerRing(
                 if (stageIndex in 0..9) {
                     Box(
                         modifier = Modifier
-                            .offset(y = (-68).dp)
-                            .size(76.dp)
+                            .offset(y = (-70).dp)
+                            .size(70.dp)
+                            .border(BorderStroke(1.dp, elapsedColor), CircleShape)
+                            .clip(CircleShape)
                             .noRippleClickable { onTimelineClick(stageIndex) },
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter = activePainters[stageIndex],
                             contentDescription = currentStage.title,
-                            modifier = Modifier.size(76.dp)
+                            modifier = Modifier.size(60.dp)
                         )
                     }
                 }
@@ -948,21 +911,27 @@ fun TimerTextDisplay(
     timeTextColor: androidx.compose.ui.graphics.Color
 ) {
     val elapsed = elapsedMillisProvider()
-    val displayMillis = if (isCountdown && targetMillis < 168 * 3600000L) kotlin.math.max(0, targetMillis - elapsed) else elapsed
+    val displayMillis = if (isCountdown) kotlin.math.max(0, targetMillis - elapsed) else elapsed
     
-    androidx.compose.material3.Text(
-        text = formatMillis(displayMillis),
-        color = timeTextColor,
-        fontSize = 48.sp,
-        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-        fontFamily = com.example.fastingtracker.ui.theme.GeistFont,
-        modifier = androidx.compose.ui.Modifier.noRippleClickable { onToggleCountdown() },
-        style = androidx.compose.ui.text.TextStyle(
-            shadow = if (isLight) androidx.compose.ui.graphics.Shadow.None else androidx.compose.ui.graphics.Shadow(
-                color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
-                offset = androidx.compose.ui.geometry.Offset(0f, 4f),
-                blurRadius = 8f
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .padding(16.dp)
+            .noRippleClickable { onToggleCountdown() }
+    ) {
+        androidx.compose.material3.Text(
+            text = formatMillis(displayMillis),
+            color = timeTextColor,
+            fontSize = 48.sp,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+            fontFamily = com.example.fastingtracker.ui.theme.GeistFont,
+            style = androidx.compose.ui.text.TextStyle(
+                shadow = if (isLight) androidx.compose.ui.graphics.Shadow.None else androidx.compose.ui.graphics.Shadow(
+                    color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f),
+                    offset = androidx.compose.ui.geometry.Offset(0f, 4f),
+                    blurRadius = 8f
+                )
             )
         )
-    )
+    }
 }

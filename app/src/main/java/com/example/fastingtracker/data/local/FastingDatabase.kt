@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [FastingLog::class], version = 1, exportSchema = false)
+@Database(entities = [FastingLog::class, QualitativeLogEntity::class], version = 2, exportSchema = false)
 abstract class FastingDatabase : RoomDatabase() {
     abstract fun fastingDao(): FastingDao
+    abstract fun qualitativeLogDao(): QualitativeLogDao
 
     companion object {
         @Volatile
@@ -19,7 +20,9 @@ abstract class FastingDatabase : RoomDatabase() {
                     context.applicationContext,
                     FastingDatabase::class.java,
                     "fasting_tracker_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

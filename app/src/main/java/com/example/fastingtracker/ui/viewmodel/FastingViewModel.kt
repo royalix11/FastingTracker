@@ -63,7 +63,10 @@ class FastingViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val database = FastingDatabase.getDatabase(application)
-        repository = FastingRepository(database.fastingDao())
+        repository = FastingRepository(
+            fastingDao = database.fastingDao(),
+            qualitativeLogDao = database.qualitativeLogDao()
+        )
         historyLogs = repository.allLogs.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

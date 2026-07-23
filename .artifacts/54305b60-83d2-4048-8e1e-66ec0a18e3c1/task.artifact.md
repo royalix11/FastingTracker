@@ -1,0 +1,4 @@
+- [x] Update `medium_phone` emulator configuration
+    - [x] Change `hw.gpu.mode` to `host`
+    - [x] Increase `hw.ramSize` to `4096`
+- [x] Provide restart instructions

@@ -69,3 +69,13 @@ Standard Compose gray touch highlight overlays and ripple indications obscure th
 - **State Management**: Keep UI components reactive using Compose state (`remember`, `derivedStateOf`, `StateFlow`).
 - **Documentation**: Preserve all existing comments and docstrings when editing files unless explicitly requested to modify them.
 - **Modular Design**: Reuse components from `com.example.fastingtracker.ui.components` and design tokens from `com.example.fastingtracker.ui.theme`.
+
+---
+
+## 6. SPARC Swarm Protocol (`@sparc-swarm`)
+When implementing complex multi-layer features (involving both Data/Room and UI/Compose layers) or when explicitly requested by the user, follow the **SPARC Swarm** methodology:
+1. Act as the **Swarm Controller** and decompose the task across architectural layers (`Room Specialist`, `Compose UI Specialist`, etc.).
+2. Launch specialized parallel subagents (`invoke_subagent` with `TypeName: self`) so data persistence and UI skills are developed concurrently without file collision.
+3. Ensure every subagent prompt explicitly enforces the `compose-no-gray-highlight` zero-ripple policy (`Modifier.noRippleClickable`), `#FFDE4D` neon accents, and `Geist / Geist Mono` typography.
+4. Once all subagents complete, run the automated deployment pipeline (`installDebug` + multi-device `adb` push) to verify compilation and immediately display the result on the emulator.
+
