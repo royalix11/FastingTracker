@@ -120,7 +120,7 @@ fun MainScreen(
                     currentStage = currentStage,
                     onStartFast = { viewmodel.startFast() },
                     onEndFast = { viewmodel.endFast() },
-                    onEditStartTimeClick = { },
+                    onEditStartTimeClick = { onItemClick(CustomFastingPlan(editStartTimeMillis = if (startTime > 0L) startTime else System.currentTimeMillis(), lockedDurationMillis = targetDuration)) },
                     onTimelineClick = { stageIndex -> onItemClick(FastingStagesTimeline(initialStageIndex = stageIndex)) },
                     onUpdateStartTime = { viewmodel.editActiveStartTime(it) }
                 )

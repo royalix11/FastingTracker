@@ -129,6 +129,7 @@ fun HomeScreen(
     onUpdateStartTime: ((Long) -> Unit)? = null
 ) {
     var showStartTimeSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -138,9 +139,53 @@ fun HomeScreen(
         verticalArrangement = Arrangement.Top
     ) {
         item {
-            Spacer(modifier = Modifier.height(44.dp))
+            Spacer(modifier = Modifier.height(28.dp))
+            val isLight = MaterialTheme.colorScheme.background == Color(0xFFFFFFFF)
+            val buttonBgColor = if (isLight) Color.White else Color.Black.copy(alpha = 0.5f)
+            val elapsedColor = if (isLight) Color(0xFFD4AF37) else Color(0xFFFFDE4D)
 
-            
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                val stageText by remember(isFasting, targetMillis, currentStage) {
+                    derivedStateOf {
+                        val remaining = targetMillis - elapsedMillisProvider()
+                        val rawText = if (!isFasting) "FASTING STAGES" else if (remaining > 0) currentStage.title else "OVERTIME"
+                        rawText.split(" ").joinToString(" ") { word ->
+                            word.lowercase().replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+                        }
+                    }
+                }
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .noRippleClickable { onTimelineClick(null) }
+                        .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 0.dp)
+                ) {
+                    Crossfade(
+                        targetState = stageText,
+                        animationSpec = tween(400),
+                        label = "stageTransition"
+                    ) { targetText ->
+                        Text(
+                            text = targetText,
+                            color = elapsedColor,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = com.example.fastingtracker.ui.theme.GeistFont,
+                            letterSpacing = 0.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -183,19 +228,14 @@ fun HomeScreen(
                 // Started Card
                 FastingInfoCard(
                     title = "Started",
-                    value = if ((isFasting || isFastingScheduled) && startTime > 0L) {
+                    value = if (startTime > 0L) {
                         SimpleDateFormat("MMM d, h:mm a", Locale.getDefault()).format(Date(startTime))
                     } else {
                         "--:--"
                     },
-                    showEditIcon = isFasting || isFastingScheduled,
-                    modifier = Modifier.weight(1f).noRippleClickable(enabled = isFasting || isFastingScheduled) {
-                        if (onUpdateStartTime != null) {
-                            showStartTimeSheet = true
-                        } else {
-                            onEditStartTimeClick()
-                        }
-                    }
+                    showEditIcon = true,
+                    onClick = { showStartTimeSheet = true },
+                    modifier = Modifier.weight(1f)
                 )
 
                 // Goal Card
@@ -238,11 +278,9 @@ fun HomeScreen(
             Instant.ofEpochMilli(endMillis).atZone(ZoneId.systemDefault()).toLocalDateTime()
         }
         val cardBg = if (isLight) Color(0xFFE8E8E8) else Color(0xFF1C1C1E)
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
         ModalBottomSheet(
             onDismissRequest = { showStartTimeSheet = false },
-            sheetState = sheetState,
             containerColor = sheetBg,
             shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
@@ -499,7 +537,7 @@ fun CircularTimerRing(
         // Transparent touch layer to capture circle taps when fasting, or start fast when idle
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .size(350.dp)
                 .clip(CircleShape)
                 .zIndex(1.5f)
                 .pointerInput(isFasting, isFastingScheduled, targetMillis) {
@@ -566,95 +604,133 @@ fun CircularTimerRing(
         val targetFastingAlpha = if (isFasting) 1f else 0f
         val fastingAlpha by animateFloatAsState(targetValue = targetFastingAlpha, animationSpec = tween(600), label = "fastingAlpha")
 
-        Canvas(
-            modifier = Modifier
-                .size(450.dp)
-                .zIndex(1f)
-        ) {
-            val ringRadius = 157.5.dp.toPx()
+        val progressAnimatable = remember { androidx.compose.animation.core.Animatable(0f) }
 
-            val totalSweepAngle = 300f // Ends at 10 o'clock
-            val minAngleGap = (44.dp.toPx() / (2f * kotlin.math.PI.toFloat() * ringRadius)) * 360f
+        val targetHours = targetMillis.toFloat() / 3600000f
+        val reachableStages = remember(targetMillis) { FastingStage.entries.filter { it.startHour <= targetHours } }
+        val effectiveRingHours = if (targetHours >= 168f) 72f else targetHours.coerceAtLeast(0.1f)
+        val totalSweepAngle = 300f
 
-            val thinRingRadius = ringRadius + (strokeWidth.toPx() / 2f) - (thinStrokeWidth.toPx() / 2f)
-            
-            val currentRadius = thinRingRadius + (ringRadius - thinRingRadius) * fastingAlpha
-            val currentStrokeWidth = thinStrokeWidth.toPx() + (strokeWidth.toPx() - thinStrokeWidth.toPx()) * fastingAlpha
-            
-            val tunnelColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF1C1C1E)
-            val currentTrackColor = androidx.compose.ui.graphics.lerp(trackColor, tunnelColor, fastingAlpha)
-
-            // 1. Draw base track/tunnel (always drawn, morphs smoothly)
-            drawCircle(
-                color = currentTrackColor,
-                radius = currentRadius,
-                style = Stroke(width = currentStrokeWidth)
-            )
-
-            val targetHours = targetMillis.toFloat() / 3600000f
-            val reachableStages = FastingStage.entries.filter { it.startHour <= targetHours }
-            val effectiveRingHours = if (targetHours >= 168f) 72f else targetHours.coerceAtLeast(0.1f)
-            
-            val idealAngles = reachableStages.map { 
+        val idealAngles = remember(targetMillis, reachableStages) {
+            val minAngleGap = 16f
+            val angles = reachableStages.map { 
                 (it.startHour.toFloat() / effectiveRingHours) * totalSweepAngle 
             }.toMutableList()
 
-            for (i in 1 until idealAngles.size) {
-                if (idealAngles[i] - idealAngles[i - 1] < minAngleGap) {
-                    idealAngles[i] = idealAngles[i - 1] + minAngleGap
+            for (i in 1 until angles.size) {
+                if (angles[i] - angles[i - 1] < minAngleGap) {
+                    angles[i] = angles[i - 1] + minAngleGap
                 }
             }
-            
-            if (idealAngles.isNotEmpty() && idealAngles.last() > totalSweepAngle) {
-                idealAngles[idealAngles.lastIndex] = totalSweepAngle
-                for (i in idealAngles.lastIndex - 1 downTo 0) {
-                    if (idealAngles[i + 1] - idealAngles[i] < minAngleGap) {
-                        idealAngles[i] = idealAngles[i + 1] - minAngleGap
+            if (angles.isNotEmpty() && angles.last() > totalSweepAngle) {
+                angles[angles.lastIndex] = totalSweepAngle
+                for (i in angles.lastIndex - 1 downTo 0) {
+                    if (angles[i + 1] - angles[i] < minAngleGap) {
+                        angles[i] = angles[i + 1] - minAngleGap
                     }
                 }
             }
+            angles
+        }
 
-            val targetProgress = if (isFasting && reachableStages.isNotEmpty()) {
-                val elapsedHours = elapsedMillisProvider().toFloat() / 3600000f
+        val currentElapsedHours = elapsedMillisProvider().toFloat() / 3600000f
+        val targetProgress = remember(isFasting, currentElapsedHours, targetMillis, idealAngles) {
+            if (isFasting && reachableStages.isNotEmpty()) {
                 val visualAngle = when {
-                    elapsedHours <= reachableStages.first().startHour -> idealAngles.first()
-                    elapsedHours >= effectiveRingHours -> totalSweepAngle
+                    currentElapsedHours <= reachableStages.first().startHour -> idealAngles.first()
+                    currentElapsedHours >= effectiveRingHours -> totalSweepAngle
                     else -> {
                         var idx = 0
-                        while (idx < reachableStages.lastIndex && reachableStages[idx + 1].startHour <= elapsedHours) {
+                        while (idx < reachableStages.lastIndex && reachableStages[idx + 1].startHour <= currentElapsedHours) {
                             idx++
                         }
                         if (idx == reachableStages.lastIndex) {
                             val h1 = reachableStages[idx].startHour.toFloat()
                             val a1 = idealAngles[idx]
-                            val frac = ((elapsedHours - h1) / (effectiveRingHours - h1)).coerceIn(0f, 1f)
+                            val frac = ((currentElapsedHours - h1) / (effectiveRingHours - h1)).coerceIn(0f, 1f)
                             a1 + frac * (totalSweepAngle - a1)
                         } else {
                             val h1 = reachableStages[idx].startHour.toFloat()
                             val h2 = reachableStages[idx + 1].startHour.toFloat()
                             val a1 = idealAngles[idx]
                             val a2 = idealAngles[idx + 1]
-                            val frac = ((elapsedHours - h1) / (h2 - h1)).coerceIn(0f, 1f)
+                            val frac = ((currentElapsedHours - h1) / (h2 - h1)).coerceIn(0f, 1f)
                             a1 + frac * (a2 - a1)
                         }
                     }
                 }
-                (visualAngle / totalSweepAngle).coerceIn(0f, 360f / totalSweepAngle)
+                (visualAngle / totalSweepAngle).coerceIn(0f, 1f)
             } else 0f
-            
-            if (smoothedProgress[0] < 0f) {
-                smoothedProgress[0] = targetProgress
+        }
+
+        LaunchedEffect(targetProgress, isFasting) {
+            if (!isFasting) {
+                progressAnimatable.snapTo(0f)
             } else {
-                val diff = targetProgress - smoothedProgress[0]
-                if (kotlin.math.abs(diff) > 0.0001f) {
-                    smoothedProgress[0] += diff * 0.03f 
-                } else {
-                    smoothedProgress[0] = targetProgress
-                }
+                progressAnimatable.animateTo(
+                    targetValue = targetProgress,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessLow)
+                )
+            }
+        }
+
+        Canvas(
+            modifier = Modifier
+                .size(450.dp)
+                .zIndex(1f)
+        ) {
+            val ringRadius = 157.5.dp.toPx()
+            val thinRingRadius = ringRadius + (strokeWidth.toPx() / 2f) - (thinStrokeWidth.toPx() / 2f)
+            
+            val currentRadius = thinRingRadius + (ringRadius - thinRingRadius) * fastingAlpha
+            val currentStrokeWidth = thinStrokeWidth.toPx() + (strokeWidth.toPx() - thinStrokeWidth.toPx()) * fastingAlpha
+
+            // Revertibility flag: set to false to immediately revert to original solid tunnel
+            val useLiquidGlassTunnel = false
+            val tunnelColor = if (isLight) Color(0xFFE5E5EA) else Color(0xFF1C1C1E)
+            val currentTrackColor = androidx.compose.ui.graphics.lerp(trackColor, tunnelColor, fastingAlpha)
+
+            if (useLiquidGlassTunnel && fastingAlpha > 0.05f) {
+                // Liquid Glass Tunnel (Translating CSS glassmorphism: blur, depth shadow, translucent backdrop, specular rim)
+                // a. Ambient depth shadow (box-shadow)
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.45f * fastingAlpha),
+                    radius = currentRadius,
+                    style = Stroke(width = currentStrokeWidth + 4.dp.toPx())
+                )
+                // b. Translucent Liquid Glass Body (background rgba & backdrop-filter blur)
+                val glassBodyColor = if (isLight) Color.White.copy(alpha = 0.65f) else Color(0xFF222226).copy(alpha = 0.65f)
+                val blendedTunnel = androidx.compose.ui.graphics.lerp(trackColor, glassBodyColor, fastingAlpha)
+                drawCircle(
+                    color = blendedTunnel,
+                    radius = currentRadius,
+                    style = Stroke(width = currentStrokeWidth)
+                )
+                // c. Glass Outer Specular Highlight Rim
+                val outerRimColor = if (isLight) Color.White.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.25f)
+                drawCircle(
+                    color = outerRimColor.copy(alpha = outerRimColor.alpha * fastingAlpha),
+                    radius = currentRadius + (currentStrokeWidth / 2f),
+                    style = Stroke(width = 1.dp.toPx())
+                )
+                // d. Glass Inner Specular Highlight Rim
+                val innerRimColor = if (isLight) Color.Black.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.12f)
+                drawCircle(
+                    color = innerRimColor.copy(alpha = innerRimColor.alpha * fastingAlpha),
+                    radius = (currentRadius - (currentStrokeWidth / 2f)).coerceAtLeast(0f),
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            } else {
+                // Original solid track/tunnel
+                drawCircle(
+                    color = currentTrackColor,
+                    radius = currentRadius,
+                    style = Stroke(width = currentStrokeWidth)
+                )
             }
 
             if (fastingAlpha > 0f) {
-                val drawnProgress = smoothedProgress[0] * startupAnimation.value
+                val drawnProgress = progressAnimatable.value * startupAnimation.value
 
                 // 2. Draw active progress line
                 drawArc(
@@ -673,17 +749,8 @@ fun CircularTimerRing(
                 val tipY = center.y + currentRadius * kotlin.math.sin(angleRadians)
                 val tipOffset = androidx.compose.ui.geometry.Offset(tipX, tipY)
 
-                // 4. Draw ripple wave animating outward from the tip
+                // 5. Draw tip (snake head)
                 val snakeHeadColor = if (isLight) Color(0xFFD4AF37) else Color(0xFFFFDE4D)
-                val maxWaveRadius = currentStrokeWidth * 0.75f
-                drawCircle(
-                    color = snakeHeadColor.copy(alpha = waveAlpha * fastingAlpha),
-                    radius = (currentStrokeWidth / 2f) + (maxWaveRadius * waveScale),
-                    center = tipOffset,
-                    style = Stroke(width = (2.dp.toPx() * fastingAlpha).coerceAtLeast(0.01f))
-                )
-
-                // 5. Draw glowing tip (snake head)
                 drawCircle(
                     color = snakeHeadColor.copy(alpha = fastingAlpha),
                     radius = currentStrokeWidth / 2.5f,
@@ -707,10 +774,10 @@ fun CircularTimerRing(
                 reachableStages.forEachIndexed { i, stage ->
                     val stageIndex = FastingStage.entries.indexOf(stage)
                     val visualAngle = idealAngles[i]
-                    val angleRad = (visualAngle - 90f) * (kotlin.math.PI / 180f).toFloat()
+                    val angleRad = (visualAngle - 90f) * (kotlin.math.PI.toFloat() / 180f)
                     
-                    val cx = center.x + currentRadius * kotlin.math.cos(angleRad)
-                    val cy = center.y + currentRadius * kotlin.math.sin(angleRad)
+                    val cx = center.x + currentRadius * kotlin.math.cos(angleRad.toDouble()).toFloat()
+                    val cy = center.y + currentRadius * kotlin.math.sin(angleRad.toDouble()).toFloat()
                     
                     val isStageActive = currentRingAngle >= visualAngle
                     val currentIconColor = if (isStageActive) activeIconColor else defaultIconColor
@@ -835,7 +902,8 @@ fun FastingInfoCard(
     title: String,
     value: String,
     modifier: Modifier = Modifier,
-    showEditIcon: Boolean = false
+    showEditIcon: Boolean = false,
+    onClick: (() -> Unit)? = null
 ) {
     val isLight = MaterialTheme.colorScheme.background == Color(0xFFFFFFFF)
     val cardBg = if (isLight) Color.White else Color(0xFF121212)
@@ -844,49 +912,47 @@ fun FastingInfoCard(
     val valueColor = if (isLight) Color.Black else Color.White
     val accentColor = if (isLight) Color(0xFFD4AF37) else Color(0xFFFFDE4D)
 
-    Card(
+    Box(
         modifier = modifier
             .height(90.dp)
-            .border(BorderStroke(1.dp, cardBorder), RoundedCornerShape(12.dp)),
-        colors = CardDefaults.cardColors(containerColor = cardBg),
-        shape = RoundedCornerShape(12.dp)
+            .background(cardBg, RoundedCornerShape(12.dp))
+            .border(BorderStroke(1.dp, cardBorder), RoundedCornerShape(12.dp))
+            .then(
+                if (onClick != null) Modifier.noRippleClickable { onClick() } else Modifier
+            )
+            .padding(16.dp)
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = title.uppercase(),
+                color = labelColor,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                fontFamily = com.example.fastingtracker.ui.theme.GeistMonoFont,
+                letterSpacing = 1.2.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                color = valueColor,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Normal,
+                fontFamily = com.example.fastingtracker.ui.theme.GeistFont
+            )
+        }
+        if (showEditIcon) {
+            androidx.compose.material3.Icon(
+                imageVector = androidx.compose.material.icons.Icons.Default.Edit,
+                contentDescription = "Edit",
+                tint = accentColor,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.Start
-            ) {
-                Text(
-                    text = title.uppercase(),
-                    color = labelColor,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    fontFamily = com.example.fastingtracker.ui.theme.GeistMonoFont,
-                    letterSpacing = 1.2.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = value,
-                    color = valueColor,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Normal,
-                    fontFamily = com.example.fastingtracker.ui.theme.GeistFont
-                )
-            }
-            if (showEditIcon) {
-                androidx.compose.material3.Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    tint = accentColor,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(top = 14.dp, end = 14.dp)
-                        .size(16.dp)
-                )
-            }
+                    .align(Alignment.TopEnd)
+                    .size(16.dp)
+            )
         }
     }
 }

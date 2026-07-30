@@ -43,11 +43,7 @@ class MainActivity : ComponentActivity() {
         }
       }
 
-      val darkTheme = when (themePref) {
-        "dark" -> true
-        "light" -> false
-        else -> isSystemInDarkTheme() // "system"
-      }
+      val darkTheme = true // Global Rule: Strict dark theme policy
 
       FastingTrackerTheme(darkTheme = darkTheme) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
